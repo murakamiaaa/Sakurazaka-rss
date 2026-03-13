@@ -4,11 +4,10 @@ from feedgen.feed import FeedGenerator
 import datetime
 
 def create_rss():
-    # 櫻坂46の公式ブログ一覧ページ
     list_url = "https://sakurazaka46.com/s/s46/diary/blog/list"
     
     fg = FeedGenerator()
-    fg.id("https://sakurazaka46.com/s/s46/diary/blog/list")
+    fg.id(list_url)
     fg.title("櫻坂46 公式ブログ RSS")
     fg.link(href=list_url, rel='alternate')
     fg.description("櫻坂46メンバーの公式ブログの最新更新をお届けします")
@@ -21,51 +20,49 @@ def create_rss():
     }
 
     try:
-        # 1. ブログ一覧ページのHTMLをダウンロード
         res = requests.get(list_url, headers=headers, timeout=10)
         res.raise_for_status()
-        
-        # 2. BeautifulSoupでHTMLを解析（料理）する
         soup = BeautifulSoup(res.text, 'html.parser')
         
-        # 3. 記事の「箱」を探す
-        # ※仮に <li class="box"> や <div class="com-blog-part"> のような構造を想定して、
-        # まずは「ブログの詳細ページへのリンク」を持っているタグを全部探します
+        # ブログの記事リンクを収集
         article_links = soup.find_all('a', href=True)
-        
-        # /s/s46/diary/detail/ （詳細ページのURLパターン）を含むリンクだけを抽出
         blog_posts = []
         for a in article_links:
             href = a['href']
             if '/s/s46/diary/detail/' in href:
                 full_url = f"https://sakurazaka46.com{href}" if href.startswith('/') else href
-                # 重複を避けるためURLで判定
                 if not any(post['url'] == full_url for post in blog_posts):
                     blog_posts.append({'url': full_url, 'element': a})
 
         print(f"見つかった記事の候補数: {len(blog_posts)}件")
 
-        # 4. 最新の5件だけ処理してみる
-        for post in blog_posts[:5]:
+        # 最新15件を処理
+        for post in blog_posts[:15]:
             url = post['url']
             element = post['element']
             
-            # リンクのテキストを無理やりタイトルとして取得
-            title = element.get_text(strip=True)
-            if not title:
-                title = "タイトルなし（画像リンクなどの可能性）"
+            # 💡 碧さんが見つけた「魔法の合言葉」でピンポイント抽出！
+            title_tag = element.find('h3', class_='title')
+            name_tag = element.find('p', class_='name')
+            
+            # タグの中身のテキストだけを取り出す（もし無ければデフォルト文字を入れる）
+            blog_title = title_tag.get_text(strip=True) if title_tag else "タイトルなし"
+            member_name = name_tag.get_text(strip=True) if name_tag else "メンバー"
 
-            print(f"記事を発見: {title[:20]}... (URL: {url})")
+            # RSSのタイトルを「[守屋 麗奈] こんばんは！」のように美しく整形
+            final_title = f"[{member_name}] {blog_title}"
+
+            print(f"抽出成功: {final_title}")
 
             fe = fg.add_entry()
             fe.id(url)
-            fe.title(title)
+            fe.title(final_title)
             fe.link(href=url)
-            fe.description(f"最新のブログが更新されました。\n\n確認はこちら: {url}")
+            fe.description(f"{member_name}のブログが更新されました。\n\nタイトル: {blog_title}\nURL: {url}")
             fe.pubDate(datetime.datetime.now(datetime.timezone.utc))
 
         fg.rss_file('feed.xml')
-        print("🎉 feed.xml の生成テスト完了！")
+        print("🎉 完璧な feed.xml の生成が完了しました！")
 
     except Exception as e:
         print(f"エラー発生: {e}")
