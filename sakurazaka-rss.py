@@ -69,7 +69,7 @@ def create_rss():
         print(f"見つかった記事の候補数: {len(blog_posts)}件")
 
         # 2. 最新の15件を処理し、個別ページにもアクセスする
-        for post in blog_posts[:15]:
+        for post in blog_posts[:30]:
             url = post['url']
             element = post['element']
             
